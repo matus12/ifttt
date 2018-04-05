@@ -29,6 +29,12 @@ namespace IFTTT.Controllers
             return await Task.FromResult(StatusCode(HttpStatusCode.Unauthorized));
         }
 
+        [Route("ifttt/v1/triggers/content")]
+        public async Task<IHttpActionResult> PostContentAsync()
+        {
+            return Ok(await Task.FromResult(new Content()));
+        }
+
         // POST: api/Ifttt
         [HttpPost]
         [Route("ifttt/v1/test/setup")]
