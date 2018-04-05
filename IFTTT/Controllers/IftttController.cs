@@ -1,8 +1,6 @@
-﻿using System;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Linq;
 using System.Net;
-using System.Net.Http;
 using System.Threading.Tasks;
 using System.Web.Http;
 
@@ -28,20 +26,27 @@ namespace IFTTT.Controllers
                 return await Task.FromResult(StatusCode(HttpStatusCode.OK));
             }
 
-            return await Task.FromResult(StatusCode(HttpStatusCode.ServiceUnavailable));
-        }
-
-        // GET: api/Ifttt/5
-        public string Get(int id)
-        {
-            IEnumerable<string> values;
-            Request.Headers.TryGetValues("IFTTT-Channel-Key", out values);
-            return "value";
+            return await Task.FromResult(StatusCode(HttpStatusCode.Unauthorized));
         }
 
         // POST: api/Ifttt
-        public void Post([FromBody]string value)
+        [HttpPost]
+        [Route("ifttt/v1/test/setup")]
+        public async Task<IHttpActionResult> Post([FromBody]string value)
         {
+            string key = "";
+            IEnumerable<string> values;
+            if (Request.Headers.TryGetValues("IFTTT-Channel-Key", out values))
+            {
+                key = values.FirstOrDefault();
+            }
+
+            if (key.Equals(KEY))
+            {
+                return Ok(await Task.FromResult(new Response()));
+            }
+
+            return await Task.FromResult(StatusCode(HttpStatusCode.Unauthorized));
         }
 
         // PUT: api/Ifttt/5
