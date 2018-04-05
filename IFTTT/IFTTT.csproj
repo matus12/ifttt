@@ -92,9 +92,15 @@
       <DependentUpon>Global.asax</DependentUpon>
     </Compile>
     <Compile Include="Models\Content.cs" />
+    <Compile Include="Models\ContentError.cs" />
     <Compile Include="Models\Data.cs" />
+    <Compile Include="Models\Error.cs" />
+    <Compile Include="Models\IftttSource.cs" />
+    <Compile Include="Models\Meta.cs" />
+    <Compile Include="Models\RequestObject.cs" />
     <Compile Include="Models\Samples.cs" />
     <Compile Include="Models\TriggerFields.cs" />
+    <Compile Include="Models\User.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>
@@ -121,7 +127,7 @@
     <VisualStudio>
       <FlavorProperties GUID="{349c5851-65df-11da-9384-00065b846f21}">
         <WebProjectProperties>
-          <UseIIS>True</UseIIS>
+          <UseIIS>False</UseIIS>
           <AutoAssignPort>True</AutoAssignPort>
           <DevelopmentServerPort>60239</DevelopmentServerPort>
           <DevelopmentServerVPath>/</DevelopmentServerVPath>

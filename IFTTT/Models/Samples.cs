@@ -7,11 +7,11 @@ namespace IFTTT
 {
     public class Samples
     {
-        public string MySample;
+        public string Field;
 
         public Samples()
         {
-            MySample = "Some sample";
+            Field = "Sample text";
         }
     }
 }

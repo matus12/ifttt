@@ -7,12 +7,15 @@ namespace IFTTT
 {
     public class Content
     {
-        public Guid Trigger_identity;
-        public TriggerFields TriggerFields;
-        public Content()
+        public TriggerFields[] Data;
+
+        public Content(int limit)
         {
-            Trigger_identity = Guid.NewGuid();
-            TriggerFields = new TriggerFields();
+            Data = new TriggerFields[limit];
+            for (int i = 0; i < limit; i++)
+            {
+                Data[i] = new TriggerFields($"field{i+1}");
+            }
         }
     }
 }

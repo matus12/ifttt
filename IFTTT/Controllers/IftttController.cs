@@ -30,10 +30,32 @@ namespace IFTTT.Controllers
         }
 
         [Route("ifttt/v1/triggers/content")]
-        public async Task<IHttpActionResult> PostContentAsync()
+        public async Task<IHttpActionResult> PostContentAsync([FromBody]RequestObject requestObject)
         {
-            return Ok(await Task.FromResult(new Content()));
+            string key = "";
+            IEnumerable<string> values;
+            if (Request.Headers.TryGetValues("IFTTT-Channel-Key", out values))
+            {
+                key = values.FirstOrDefault();
+            }
+
+            if (!key.Equals(KEY))
+            {
+                return Content(HttpStatusCode.Unauthorized, await Task.FromResult(new ContentError()));
+            }
+
+            if (requestObject == null || requestObject.limit == -1)
+            {
+                return Ok(await Task.FromResult(new Content(3)));
+            }
+            return Ok(await Task.FromResult(new Content(requestObject.limit)));
         }
+
+        /*[Route("ifttt/v1/triggers/content")]
+        public async Task<IHttpActionResult> PostContentAsync([FromBody]int limit)
+        {
+            return Ok(await Task.FromResult(new Content(limit)));
+        }*/
 
         // POST: api/Ifttt
         [HttpPost]
