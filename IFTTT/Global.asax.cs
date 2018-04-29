@@ -8,6 +8,7 @@ namespace IFTTT
         {
             GlobalConfiguration.Configure(WebApiConfig.Register);
             GlobalConfiguration.Configure(ApiFormatConfig.Register);
+            GlobalConfiguration.Configure(DependenciesConfig.Register);
         }
     }
 }

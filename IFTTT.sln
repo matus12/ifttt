@@ -5,6 +5,10 @@ VisualStudioVersion = 15.0.27428.2015
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "IFTTT", "IFTTT\IFTTT.csproj", "{4C111417-CABC-4AAB-8E20-2E86382F3CED}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ContentService", "ContentService\ContentService.csproj", "{96185E19-60D5-4583-9283-0E84C9AAA9CE}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Contracts", "Contracts\Contracts.csproj", "{0969B7EA-D2ED-42FE-A59C-A82E2F7F8C2E}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -15,6 +19,14 @@ Global
 		{4C111417-CABC-4AAB-8E20-2E86382F3CED}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{4C111417-CABC-4AAB-8E20-2E86382F3CED}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{4C111417-CABC-4AAB-8E20-2E86382F3CED}.Release|Any CPU.Build.0 = Release|Any CPU
+		{96185E19-60D5-4583-9283-0E84C9AAA9CE}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{96185E19-60D5-4583-9283-0E84C9AAA9CE}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{96185E19-60D5-4583-9283-0E84C9AAA9CE}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{96185E19-60D5-4583-9283-0E84C9AAA9CE}.Release|Any CPU.Build.0 = Release|Any CPU
+		{0969B7EA-D2ED-42FE-A59C-A82E2F7F8C2E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{0969B7EA-D2ED-42FE-A59C-A82E2F7F8C2E}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{0969B7EA-D2ED-42FE-A59C-A82E2F7F8C2E}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{0969B7EA-D2ED-42FE-A59C-A82E2F7F8C2E}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

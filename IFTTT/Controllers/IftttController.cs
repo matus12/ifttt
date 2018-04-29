@@ -1,75 +1,86 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Net;
+using System.Net.Http;
+using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using System.Web.Http;
+using Contracts.Models;
+using Contracts.Services;
+using Contracts.Wrappers;
+using KenticoCloud.Delivery;
 
 namespace IFTTT.Controllers
 {
     public class IftttController : ApiController
     {
-        const string KEY = "cDxBDvAD_g-2azRWdnKqlqBcRptNxeL2l3LKw8R2TJcpcyW7RSNZaPmRx-o_9R7k";
+        private const string Key = "cDxBDvAD_g-2azRWdnKqlqBcRptNxeL2l3LKw8R2TJcpcyW7RSNZaPmRx-o_9R7k";
+        private readonly IContentService _contentService;
+        private readonly IHttpClientWrapper _httpClientWrapper;
+
+
+        public IftttController(
+            IContentService contentService,
+            IHttpClientWrapper httpClientWrapper)
+        {
+            _contentService = contentService;
+            _httpClientWrapper = httpClientWrapper;
+        }
 
         // GET: api/Ifttt
         [Route("ifttt/v1/status")]
-        public async Task<IHttpActionResult> GetAsync()
-        {
-            string key = "";
-            IEnumerable<string> values;
-            if (Request.Headers.TryGetValues("IFTTT-Channel-Key", out values))
-            {
-                key = values.FirstOrDefault();
-            }
+        public async Task<IHttpActionResult> GetAsync() =>
+            IsKeyValid()
+                ? await Task.FromResult(StatusCode(HttpStatusCode.OK))
+                : await Task.FromResult(StatusCode(HttpStatusCode.Unauthorized));
 
-            if (key.Equals(KEY))
-            {
-                return await Task.FromResult(StatusCode(HttpStatusCode.OK));
-            }
-
-            return await Task.FromResult(StatusCode(HttpStatusCode.Unauthorized));
-        }
 
         [Route("ifttt/v1/triggers/content")]
-        public async Task<IHttpActionResult> PostContentAsync([FromBody]RequestObject requestObject)
+        public async Task<IHttpActionResult> PostContentAsync([FromBody] RequestObject requestObject)
         {
-            string key = "";
-            IEnumerable<string> values;
-            if (Request.Headers.TryGetValues("IFTTT-Channel-Key", out values))
-            {
-                key = values.FirstOrDefault();
-            }
-
-            if (!key.Equals(KEY))
+            if (!IsKeyValid())
             {
                 return Content(HttpStatusCode.Unauthorized, await Task.FromResult(new ContentError()));
             }
 
+            // var contentToReturn = _contentService.TriggerData.Values.First();
+            //var projectId = _contentService.ProjectId;
+            //_contentService.TriggerData.Remove(projectId);
+
             if (requestObject == null || requestObject.limit == -1)
             {
-                return Ok(await Task.FromResult(new Content(3)));
+                return Ok(await Task.FromResult(new Content("f5dd2c63-2de7-48cc-8ff6-129e939491c0", "wtf")));
+                //return await Task.FromResult(StatusCode(HttpStatusCode.NoContent));
             }
-            return Ok(await Task.FromResult(new Content(requestObject.limit)));
+
+            if (_contentService.TriggerData.TryGetValue(requestObject.TriggerFields.Project_id, out var triggerData))
+            {
+                triggerData.TryGetValue(requestObject.Trigger_identity, out var triggerFields);
+
+                return Ok(await Task.FromResult(new Content(triggerFields)));
+            }
+
+            var map = new Dictionary<string, TriggerFields>
+            {
+                {requestObject.Trigger_identity, new TriggerFields(requestObject.TriggerFields.Project_id)}
+            };
+            _contentService.TriggerData.Add(requestObject.TriggerFields.Project_id, map);
+
+            //_contentService.TriggerData.Add(_contentService.ProjectId, requestObject.Trigger_identity);
+
+            // await PostContent(_contentService.TriggerData.Values.First());
+
+            return Ok(await Task.FromResult(new Content("f5dd2c63-2de7-48cc-8ff6-129e939491c0", "wtf")));
+            //return await Task.FromResult(StatusCode(HttpStatusCode.NoContent));
         }
 
-        /*[Route("ifttt/v1/triggers/content")]
-        public async Task<IHttpActionResult> PostContentAsync([FromBody]int limit)
-        {
-            return Ok(await Task.FromResult(new Content(limit)));
-        }*/
-
-        // POST: api/Ifttt
         [HttpPost]
         [Route("ifttt/v1/test/setup")]
-        public async Task<IHttpActionResult> Post([FromBody]string value)
+        public async Task<IHttpActionResult> Post([FromBody] string value)
         {
-            string key = "";
-            IEnumerable<string> values;
-            if (Request.Headers.TryGetValues("IFTTT-Channel-Key", out values))
-            {
-                key = values.FirstOrDefault();
-            }
-
-            if (key.Equals(KEY))
+            if (IsKeyValid())
             {
                 return Ok(await Task.FromResult(new Response()));
             }
@@ -77,17 +88,137 @@ namespace IFTTT.Controllers
             return await Task.FromResult(StatusCode(HttpStatusCode.Unauthorized));
         }
 
-        // PUT: api/Ifttt/5
-        public void Put(int id, [FromBody]string value)
+        [HttpPost]
+        [Route("ifttt/v1/hook")]
+        public async Task<IHttpActionResult> Post([FromBody] Webhook webhook)
         {
+            var client = _httpClientWrapper.HttpClient;
+            var deliveryClient = new DeliveryClient("f5dd2c63-2de7-48cc-8ff6-129e939491c0");
+            var response = await deliveryClient.GetItemAsync(webhook.Data.Items.First().Codename);
+            var elements = response.Item.Elements;
+
+            _contentService.ProjectId = webhook.Message.ProjectId.ToString();
+
+            await PostRealtime(webhook.Message.ProjectId.ToString());
+
+            var requestMessage =
+                new HttpRequestMessage(
+                    HttpMethod.Put,
+                    "https://webhook.site/15851e96-6f08-4d9d-9e9b-11ff19e057d6"
+                );
+            var children = elements.Children();
+            var str = "";
+            var list = new List<string>();
+            foreach (var result in children)
+            {
+                var type = result.First.type.ToString();
+                var value = result.First.value.ToString();
+                if (type.Equals("multiple_choice"))
+                {
+                    continue;
+                }
+
+                if (type.Equals("rich_text"))
+                {
+                    var strippedText = StripHtml(value);
+                    str += strippedText;
+                    list.Add(strippedText);
+                }
+                else
+                {
+                    str += value + " ";
+                    list.Add(value);
+                }
+            }
+
+            var triggerFields = new TriggerFields(_contentService.ProjectId);
+
+            for (var i = 1; i < 11; i++)
+            {
+                var info = triggerFields.GetType().GetField("Value" + i);
+                info.SetValue(triggerFields, list[i]);
+            }
+
+            if (_contentService.TriggerData.ContainsKey(_contentService.ProjectId))
+            {
+                /*TODO: Meta id: aby sa neopakovali rovnake data*/
+                /*TODO: Zaistit pridanie dat do servisy odtialto (mapovanie content-item name na trigger identity?)*/
+                _contentService.TriggerData[webhook.Message.ProjectId.ToString()][""] = triggerFields;
+            }
+
+            requestMessage.Headers.Add(
+                "IFTTT-Service-Key",
+                "cDxBDvAD_g-2azRWdnKqlqBcRptNxeL2l3LKw8R2TJcpcyW7RSNZaPmRx-o_9R7k"
+            );
+            requestMessage.Headers.Add("Accept-Encoding", "gzip, deflate");
+            requestMessage.Headers.Add("X-Request-ID", Guid.NewGuid().ToString());
+            requestMessage.Content = new StringContent(
+                "{" +
+                "\"data\": " +
+                "[ { \"trigger_identity\": \"" +
+                str +
+                "\" }, ] }",
+                Encoding.UTF8,
+                "application/json"
+            );
+
+            await client.SendAsync(requestMessage);
+
+            return await Task.FromResult(StatusCode(HttpStatusCode.OK));
         }
 
-        // DELETE: api/Ifttt/5
-        public void Delete(int id)
+        private bool IsKeyValid()
         {
+            var key = "";
+
+            if (Request.Headers.TryGetValues("IFTTT-Channel-Key", out var values))
+            {
+                key = values.FirstOrDefault();
+            }
+
+            return key != null && key.Equals(Key);
         }
 
-        public async Task GetTask()
-            => await Task.CompletedTask;
+        private async Task PostContent(string value = "")
+        {
+            var client = _httpClientWrapper.HttpClient;
+
+            var content = new StringContent(
+                "{\"text\":\"" + _contentService.ProjectId + " " + value + "\"}",
+                Encoding.UTF8,
+                "application/json"
+            );
+            await client.PostAsync("https://webhook.site/15851e96-6f08-4d9d-9e9b-11ff19e057d6", content);
+        }
+
+        private async Task PostRealtime(string projectId)
+        {
+            var client = _httpClientWrapper.HttpClient;
+            if (_contentService.TriggerData.TryGetValue(projectId, out var triggerInfo))
+            {
+                var content = new StringContent(
+                    "{" +
+                    "\"data\": " +
+                    "[ { \"trigger_identity\": \"" +
+                    triggerInfo.Keys.First() + "REALTIME BITCH!" +
+                    "\" }, ] }",
+                    Encoding.UTF8,
+                    "application/json"
+                );
+                content.Headers.Add(
+                    "IFTTT-Service-Key",
+                    "cDxBDvAD_g-2azRWdnKqlqBcRptNxeL2l3LKw8R2TJcpcyW7RSNZaPmRx-o_9R7k"
+                );
+                //content.Headers.Add("Accept-Encoding", "gzip, deflate");
+                content.Headers.Add("X-Request-ID", Guid.NewGuid().ToString());
+
+                await client.PostAsync("https://webhook.site/15851e96-6f08-4d9d-9e9b-11ff19e057d6", content);
+            }
+        }
+
+        private static string StripHtml(string input)
+        {
+            return Regex.Replace(input, "<.*?>", String.Empty);
+        }
     }
 }
