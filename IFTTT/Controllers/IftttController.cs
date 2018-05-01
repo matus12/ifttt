@@ -18,7 +18,7 @@ namespace IFTTT.Controllers
     {
         private const string Key = "cDxBDvAD_g-2azRWdnKqlqBcRptNxeL2l3LKw8R2TJcpcyW7RSNZaPmRx-o_9R7k";
         private readonly IContentService _contentService;
-        private readonly IHttpClientWrapper _httpClientWrapper;
+        private readonly HttpClient _httpClient;
 
 
         public IftttController(
@@ -26,7 +26,7 @@ namespace IFTTT.Controllers
             IHttpClientWrapper httpClientWrapper)
         {
             _contentService = contentService;
-            _httpClientWrapper = httpClientWrapper;
+            _httpClient = httpClientWrapper.HttpClient;
         }
 
         // GET: api/Ifttt
@@ -59,13 +59,16 @@ namespace IFTTT.Controllers
             {
                 triggerData.TryGetValue(requestObject.Trigger_identity, out var triggerFields);
 
+                _contentService.TriggerData[requestObject.TriggerFields.Project_id].Remove(requestObject.Trigger_identity);
+
                 return Ok(await Task.FromResult(new Content(triggerFields)));
             }
 
             var map = new Dictionary<string, TriggerFields>
             {
-                {requestObject.Trigger_identity, new TriggerFields(requestObject.TriggerFields.Project_id)}
+                {requestObject.Trigger_identity, requestObject.TriggerFields}
             };
+
             _contentService.TriggerData.Add(requestObject.TriggerFields.Project_id, map);
 
             //_contentService.TriggerData.Add(_contentService.ProjectId, requestObject.Trigger_identity);
@@ -92,10 +95,10 @@ namespace IFTTT.Controllers
         [Route("ifttt/v1/hook")]
         public async Task<IHttpActionResult> Post([FromBody] Webhook webhook)
         {
-            var client = _httpClientWrapper.HttpClient;
             var deliveryClient = new DeliveryClient("f5dd2c63-2de7-48cc-8ff6-129e939491c0");
             var response = await deliveryClient.GetItemAsync(webhook.Data.Items.First().Codename);
             var elements = response.Item.Elements;
+            var triggerIdentity = "";
 
             _contentService.ProjectId = webhook.Message.ProjectId.ToString();
 
@@ -139,16 +142,20 @@ namespace IFTTT.Controllers
                 info.SetValue(triggerFields, list[i]);
             }
 
-            if (_contentService.TriggerData.ContainsKey(_contentService.ProjectId))
+            /*TODO: vyriesit aby sa id v meta generovalo nove iba pri webhooku*/
+            if (_contentService.TriggerData.TryGetValue(webhook.Message.ProjectId.ToString(), out var triggerData))
             {
-                /*TODO: Meta id: aby sa neopakovali rovnake data*/
-                /*TODO: Zaistit pridanie dat do servisy odtialto (mapovanie content-item name na trigger identity?)*/
-                _contentService.TriggerData[webhook.Message.ProjectId.ToString()][""] = triggerFields;
+                foreach (var entry in triggerData)
+                {
+                    if (entry.Value.Content_item_codename != webhook.Data.Items[0].Codename) continue;
+                    triggerIdentity = entry.Key;
+                    _contentService.TriggerData[webhook.Message.ProjectId.ToString()][triggerIdentity] = triggerFields;
+                }
             }
 
             requestMessage.Headers.Add(
                 "IFTTT-Service-Key",
-                "cDxBDvAD_g-2azRWdnKqlqBcRptNxeL2l3LKw8R2TJcpcyW7RSNZaPmRx-o_9R7k"
+                Key
             );
             requestMessage.Headers.Add("Accept-Encoding", "gzip, deflate");
             requestMessage.Headers.Add("X-Request-ID", Guid.NewGuid().ToString());
@@ -156,13 +163,13 @@ namespace IFTTT.Controllers
                 "{" +
                 "\"data\": " +
                 "[ { \"trigger_identity\": \"" +
-                str +
+                triggerIdentity +
                 "\" }, ] }",
                 Encoding.UTF8,
                 "application/json"
             );
 
-            await client.SendAsync(requestMessage);
+            await _httpClient.SendAsync(requestMessage);
 
             return await Task.FromResult(StatusCode(HttpStatusCode.OK));
         }
@@ -181,19 +188,16 @@ namespace IFTTT.Controllers
 
         private async Task PostContent(string value = "")
         {
-            var client = _httpClientWrapper.HttpClient;
-
             var content = new StringContent(
                 "{\"text\":\"" + _contentService.ProjectId + " " + value + "\"}",
                 Encoding.UTF8,
                 "application/json"
             );
-            await client.PostAsync("https://webhook.site/15851e96-6f08-4d9d-9e9b-11ff19e057d6", content);
+            await _httpClient.PostAsync("https://webhook.site/15851e96-6f08-4d9d-9e9b-11ff19e057d6", content);
         }
 
         private async Task PostRealtime(string projectId)
         {
-            var client = _httpClientWrapper.HttpClient;
             if (_contentService.TriggerData.TryGetValue(projectId, out var triggerInfo))
             {
                 var content = new StringContent(
@@ -212,13 +216,13 @@ namespace IFTTT.Controllers
                 //content.Headers.Add("Accept-Encoding", "gzip, deflate");
                 content.Headers.Add("X-Request-ID", Guid.NewGuid().ToString());
 
-                await client.PostAsync("https://webhook.site/15851e96-6f08-4d9d-9e9b-11ff19e057d6", content);
+                await _httpClient.PostAsync("https://webhook.site/15851e96-6f08-4d9d-9e9b-11ff19e057d6", content);
             }
         }
 
         private static string StripHtml(string input)
         {
-            return Regex.Replace(input, "<.*?>", String.Empty);
+            return Regex.Replace(input, "<.*?>", string.Empty);
         }
     }
 }

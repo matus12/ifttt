@@ -4,8 +4,12 @@ namespace Contracts.Models
 {
     public class TriggerFields
     {
+        // ReSharper disable once InconsistentNaming
         public string Project_id;
+        // ReSharper disable once InconsistentNaming
+        public string Content_item_codename;
         public Meta Meta;
+        // ReSharper disable once InconsistentNaming
         public DateTime Created_at;
         public string Value1 { get; set; }
         public string Value2 { get; set; }
