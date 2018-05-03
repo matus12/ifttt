@@ -39,28 +39,54 @@ namespace IFTTT.Controllers
         [Route("ifttt/v1/triggers/content")]
         public async Task<IHttpActionResult> PostContentAsync([FromBody] RequestObject requestObject)
         {
+            var nameFilter = string.Empty;
+            if (Request.Headers.TryGetValues("X-IFTTT-Realtime", out var headerValues))
+            {
+                nameFilter = headerValues.FirstOrDefault();
+            }
+
+            var content2 = new StringContent(
+                "Trigger identity: " + requestObject.Trigger_identity + 
+                "\nREALTIME: " + nameFilter +
+                "\nprojectId: " + requestObject.TriggerFields.Project_id +
+                "\ncodename: " + requestObject.TriggerFields.Content_item_codename,
+                Encoding.UTF8,
+                "application/json"
+            );
+            content2.Headers.Add(
+                "IFTTT-Service-Key",
+                Key
+            );
+            content2.Headers.Add("X-Request-ID", Guid.NewGuid().ToString());
+
+            await _httpClient.PostAsync("https://webhook.site/420e307d-2a1e-425a-828a-4fdc2966e1a9", content2);
+
             if (!IsKeyValid())
             {
                 return Content(HttpStatusCode.Unauthorized, await Task.FromResult(new ContentError()));
-            }
-
-            if (requestObject == null || requestObject.limit == -1)
-            {
-                return Ok(await Task.FromResult(new Content("f5dd2c63-2de7-48cc-8ff6-129e939491c0", "wtf")));
             }
 
             var projectId = requestObject.TriggerFields.Project_id;
 
             if (_contentService.TriggerData.TryGetValue(projectId, out var triggerData))
             {
-                if (triggerData.TryGetValue(requestObject.Trigger_identity, out var triggerFields))
+                if (triggerData.TryGetValue(requestObject.TriggerFields.Content_item_codename,
+                    out var triggerFields))
                 {
-                    if (triggerFields.Content_item_codename == requestObject.TriggerFields.Content_item_codename)
-                    {
-                        return Ok(await Task.FromResult(new Content(triggerFields)));
-                    }
+                    return Ok(await Task.FromResult(new Content(triggerFields)));
                 }
             }
+
+            //if (_contentService.TriggerData.TryGetValue(projectId, out var triggerData2))
+            //{
+            //    if (triggerData2.TryGetValue(requestObject.Trigger_identity, out var triggerFields))
+            //    {
+            //        if (triggerFields.Content_item_codename == requestObject.TriggerFields.Content_item_codename)
+            //        {
+            //            return Ok(await Task.FromResult(new Content(triggerFields)));
+            //        }
+            //    }
+            //}
 
             return await Task.FromResult(StatusCode(HttpStatusCode.NoContent));
         }
@@ -85,9 +111,7 @@ namespace IFTTT.Controllers
             var deliveryClient = new DeliveryClient(projectId);
             var response = await deliveryClient.GetItemAsync(webhook.Data.Items.First().Codename);
             var elements = response.Item.Elements;
-            var triggerIdentity = Guid.NewGuid().ToString();
-
-            await PostRealtime(triggerIdentity);
+            var codename = webhook.Data.Items[0].Codename;
 
             var children = elements.Children();
             var str = "";
@@ -116,39 +140,49 @@ namespace IFTTT.Controllers
 
             var triggerFields = new TriggerFields(_contentService.ProjectId)
             {
-                Content_item_codename = webhook.Data.Items[0].Codename,
-                Project_id = webhook.Message.ProjectId.ToString()
+                Content_item_codename = codename,
+                Project_id = webhook.Message.ProjectId.ToString(),
             };
 
             for (var i = 1; i < list.Count; i++)
             {
                 var info = triggerFields.GetType().GetProperty("Value" + i);
-                if (info != null) info.SetValue(triggerFields, list[i]);
+                if (info != null) info.SetValue(triggerFields, list[i - 1]);
             }
 
             if (_contentService.TriggerData.TryGetValue(projectId, out var contentData))
             {
-                string keyToRemove = null;
-                foreach (var entry in contentData)
+                //string keyToRemove = null;
+                //foreach (var entry in contentData)
+                //{
+                //    if (entry.Value.Content_item_codename == webhook.Data.Items[0].Codename)
+                //    {
+                //        keyToRemove = entry.Key;
+                //    }
+                //}
+
+                //if (keyToRemove != null)
+                //{
+                //    _contentService.TriggerData[projectId].Remove(keyToRemove);
+                //}
+                if (contentData.TryGetValue(codename, out var triggerData))
                 {
-                    if (entry.Value.Content_item_codename == webhook.Data.Items[0].Codename)
-                    {
-                        keyToRemove = entry.Key;
-                    }
+                    await PostRealtime(triggerData.Trigger_identity);
+                    triggerFields.Trigger_identity = triggerData.Trigger_identity;
+                    _contentService.TriggerData[projectId][codename] = triggerFields;
+                }
+                else
+                {
+                    _contentService.TriggerData[projectId].Add(codename, triggerFields);
                 }
 
-                if (keyToRemove != null)
-                {
-                    _contentService.TriggerData[projectId].Remove(keyToRemove);
-                }
-
-                _contentService.TriggerData[projectId].Add(triggerIdentity, triggerFields);
+                //_contentService.TriggerData[projectId].Add(triggerIdentity, triggerFields);
             }
             else
             {
                 var triggerData = new Dictionary<string, TriggerFields>()
                 {
-                    {triggerIdentity, triggerFields}
+                    {codename, triggerFields}
                 };
                 _contentService.TriggerData.Add(projectId, triggerData);
             }
@@ -175,7 +209,7 @@ namespace IFTTT.Controllers
                 "\"data\": " +
                 "[ { \"trigger_identity\": \"" +
                 triggerIdentity +
-                "\" }, ] }",
+                "\" } ] }",
                 Encoding.UTF8,
                 "application/json"
             );
@@ -186,23 +220,6 @@ namespace IFTTT.Controllers
             content.Headers.Add("X-Request-ID", Guid.NewGuid().ToString());
 
             await _httpClient.PostAsync("https://realtime.ifttt.com/v1/notifications", content);
-
-            content = new StringContent(
-                "{" +
-                "\"data\": " +
-                "[ { \"trigger_identity\": \"" +
-                triggerIdentity +
-                "\" }, ] }",
-                Encoding.UTF8,
-                "application/json"
-            );
-            content.Headers.Add(
-                "IFTTT-Service-Key",
-                Key
-            );
-            content.Headers.Add("X-Request-ID", Guid.NewGuid().ToString());
-
-            await _httpClient.PostAsync("https://webhook.site/15851e96-6f08-4d9d-9e9b-11ff19e057d6", content);
         }
 
         private static string StripHtml(string input)

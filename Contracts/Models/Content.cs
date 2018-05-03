@@ -13,12 +13,6 @@
             }
         }
 
-        public Content(string value, string fromHook)
-        {
-            Data = new TriggerFields[1];
-            Data[0] = new TriggerFields(value) {Value1 = fromHook, Value2 = "value2", Value3 = "value3"};
-        }
-
         public Content(TriggerFields triggerFields)
         {
             Data = new TriggerFields[1];

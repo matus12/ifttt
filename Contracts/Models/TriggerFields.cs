@@ -11,6 +11,8 @@ namespace Contracts.Models
         public Meta Meta;
         // ReSharper disable once InconsistentNaming
         public DateTime Created_at;
+        // ReSharper disable once InconsistentNaming
+        public string Trigger_identity;
         public string Value1 { get; set; }
         public string Value2 { get; set; }
         public string Value3 { get; set; }
