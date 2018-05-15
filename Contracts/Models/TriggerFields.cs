@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 
 namespace Contracts.Models
 {
@@ -12,7 +13,7 @@ namespace Contracts.Models
         // ReSharper disable once InconsistentNaming
         public DateTime Created_at;
         // ReSharper disable once InconsistentNaming
-        public string Trigger_identity;
+        public List<string> Trigger_identity;
         public string Value1 { get; set; }
         public string Value2 { get; set; }
         public string Value3 { get; set; }
@@ -29,6 +30,7 @@ namespace Contracts.Models
             Created_at = DateTime.Now;
             Meta = new Meta();
             Project_id = value;
+            Trigger_identity = new List<string>();
         }
     }
 }

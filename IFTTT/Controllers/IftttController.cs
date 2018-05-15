@@ -46,7 +46,7 @@ namespace IFTTT.Controllers
             }
 
             var content2 = new StringContent(
-                "Trigger identity: " + requestObject.Trigger_identity + 
+                "Trigger identity: " + requestObject.Trigger_identity +
                 "\nREALTIME: " + nameFilter +
                 "\nprojectId: " + requestObject.TriggerFields.Project_id +
                 "\ncodename: " + requestObject.TriggerFields.Content_item_codename,
@@ -73,20 +73,33 @@ namespace IFTTT.Controllers
                 if (triggerData.TryGetValue(requestObject.TriggerFields.Content_item_codename,
                     out var triggerFields))
                 {
+                    if (!triggerFields.Trigger_identity.Contains(requestObject.Trigger_identity))
+                    {
+                        triggerFields.Trigger_identity.Add(requestObject.Trigger_identity);
+                    }
                     return Ok(await Task.FromResult(new Content(triggerFields)));
                 }
-            }
 
-            //if (_contentService.TriggerData.TryGetValue(projectId, out var triggerData2))
-            //{
-            //    if (triggerData2.TryGetValue(requestObject.Trigger_identity, out var triggerFields))
-            //    {
-            //        if (triggerFields.Content_item_codename == requestObject.TriggerFields.Content_item_codename)
-            //        {
-            //            return Ok(await Task.FromResult(new Content(triggerFields)));
-            //        }
-            //    }
-            //}
+                _contentService.TriggerData[projectId] = new Dictionary<string, TriggerFields>
+                {
+                    {
+                        requestObject.TriggerFields.Content_item_codename,
+                        requestObject.TriggerFields
+                    }
+                };
+            }
+            else
+            {
+                _contentService.TriggerData.Add(
+                    projectId,
+                    new Dictionary<string, TriggerFields>
+                    {
+                        {
+                            requestObject.TriggerFields.Content_item_codename,
+                            requestObject.TriggerFields
+                        }
+                    });
+            }
 
             return await Task.FromResult(StatusCode(HttpStatusCode.NoContent));
         }
@@ -104,9 +117,14 @@ namespace IFTTT.Controllers
         }
 
         [HttpPost]
-        [Route("ifttt/v1/hook")]
+        [Route("ifttt/v1/webhook")]
         public async Task<IHttpActionResult> Post([FromBody] Webhook webhook)
         {
+            if (webhook.Message.Operation != "publish")
+            {
+                return await Task.FromResult(StatusCode(HttpStatusCode.NoContent));
+            }
+
             var projectId = webhook.Message.ProjectId.ToString();
             var deliveryClient = new DeliveryClient(projectId);
             var response = await deliveryClient.GetItemAsync(webhook.Data.Items.First().Codename);
@@ -114,7 +132,6 @@ namespace IFTTT.Controllers
             var codename = webhook.Data.Items[0].Codename;
 
             var children = elements.Children();
-            var str = "";
             var list = new List<string>();
             foreach (var result in children)
             {
@@ -127,13 +144,12 @@ namespace IFTTT.Controllers
 
                 if (type.Equals("rich_text"))
                 {
+                    result.GetString();
                     var strippedText = StripHtml(value);
-                    str += strippedText;
                     list.Add(strippedText);
                 }
                 else
                 {
-                    str += value + " ";
                     list.Add(value);
                 }
             }
@@ -152,22 +168,14 @@ namespace IFTTT.Controllers
 
             if (_contentService.TriggerData.TryGetValue(projectId, out var contentData))
             {
-                //string keyToRemove = null;
-                //foreach (var entry in contentData)
-                //{
-                //    if (entry.Value.Content_item_codename == webhook.Data.Items[0].Codename)
-                //    {
-                //        keyToRemove = entry.Key;
-                //    }
-                //}
-
-                //if (keyToRemove != null)
-                //{
-                //    _contentService.TriggerData[projectId].Remove(keyToRemove);
-                //}
                 if (contentData.TryGetValue(codename, out var triggerData))
                 {
-                    await PostRealtime(triggerData.Trigger_identity);
+                    foreach (var entry in triggerData.Trigger_identity)
+                    {
+                        await PostRealtime(entry);
+                    }
+
+                    // await PostRealtime(triggerData.Trigger_identity);
                     triggerFields.Trigger_identity = triggerData.Trigger_identity;
                     _contentService.TriggerData[projectId][codename] = triggerFields;
                 }
